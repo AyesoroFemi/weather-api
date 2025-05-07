@@ -10,6 +10,7 @@ import (
 	"github.com/weather-app/internal/repository"
 	"github.com/weather-app/internal/store"
 	"github.com/weather-app/service"
+	"go.uber.org/zap"
 )
 
 var rdb *redis.Client
@@ -28,21 +29,24 @@ func main() {
 		contextTimeout: env.GetInt("TIME_DURATION", 10),
 	}
 
+	logger  := zap.Must(zap.NewProduction()).Sugar()
+	defer logger.Sync()
+
 	rdb = store.NewRedisCache(cfg.redisCfg.addr, cfg.redisCfg.pw, cfg.redisCfg.db)
-	// logger.Info("redis cache connection established")
-	fmt.Println("redis cache connection established")
+	logger.Info("redis cache connection established")
 
 	defer rdb.Close()
 
-	expiry := 10 * time.Minute
-	timeout := 10 * time.Second
+	expiry := time.Duration(cfg.contextTimeout) * time.Minute
+	timeout := time.Duration(cfg.contextTimeout) * time.Second
+	
 	redisStore := repository.NewWeatherRepo(rdb, expiry)
 	weatheService := service.NewWeatherService(redisStore, timeout)
-
 
 	app := &application{
 		config: cfg,
 		weatherService: weatheService,
+		logger: logger,
 	}
 
 	mux := app.mount()

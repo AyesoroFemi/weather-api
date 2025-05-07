@@ -2,39 +2,26 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/sirupsen/logrus"
 	"github.com/weather-app/internal/env"
-	// "github.com/weather-app/internal/repository"
+	"go.uber.org/zap"
 	"github.com/weather-app/service"
 )
 
-// type Application struct {
-// 	Env    *Env
-// 	Client *redis.Client
-// }
-
 type application struct {
 	config config
-	// store         store.Storage
-	// cacheStorage  cache.Storage
-	logger *logrus.Logger
-	// redisStore repository.WeatherRepository
-	// authenticator auth.Authenticator
+	logger *zap.SugaredLogger
 	weatherService service.WeatherService
 }
 
 type config struct {
 	addr string
-	// env      string
-	apiURL   string
-	apiKey   string
-	redisCfg redisConfig
+	apiURL         string
+	apiKey         string
+	redisCfg       redisConfig
 	contextTimeout int
 }
 
@@ -77,7 +64,7 @@ func (app *application) run(mux http.Handler) error {
 		IdleTimeout:  time.Minute,
 	}
 
-	fmt.Println("Served has started", "addr", app.config.addr)	
+	app.logger.Infow("Served has started", "addr", app.config.addr)
 
 	err := srv.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {

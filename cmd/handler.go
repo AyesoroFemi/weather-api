@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
 	"github.com/weather-app/types"
 )
 
@@ -16,7 +15,7 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 
 	data := map[string]string{
 		"status":  "ok",
-		"env":     "8080",
+		"env":     app.config.addr,
 		"version": "1.1.0",
 	}
 
@@ -41,6 +40,7 @@ func (h *application) weatherHandler(w http.ResponseWriter, r *http.Request) {
 	// When the Redis key expires, It will be skip err and the data is re-stored in Redis.
 	// This prevents continuous API requests with the previously stored key in Redis.
 	if err == nil {
+		// h.logger.Infow("Cached hit", "city", city)   \\ to see check if it is getting the data from redis
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": "success",

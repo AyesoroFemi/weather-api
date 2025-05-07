@@ -61,7 +61,7 @@ func (s *weatherService) CreateWeather(ctx context.Context, url *types.Api) (*ty
 		Uv:          weather.Current.Uv,
 	}
 	if store.Name == "" {
-		return nil, fmt.Errorf("empty city name")
+		return nil, fmt.Errorf("wrong query city name")
 	}
 
 	if utils.NormalizeCityName(store.Name) != utils.NormalizeCityName(url.City) {
