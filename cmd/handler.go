@@ -20,6 +20,7 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
+		app.logger.Errorw("Failed to encode health check response", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -27,6 +28,8 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 
 
 func (h *application) weatherHandler(w http.ResponseWriter, r *http.Request) {
+	// h.logger.Infow("Weather endpoint accessed", "method", r.Method, "url", r.URL.String())
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(h.config.contextTimeout)*time.Second)
 	defer cancel()
 
@@ -36,11 +39,13 @@ func (h *application) weatherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Infow("Fetching weather data", "city", city)
+
 	response, err := h.weatherService.GetWeatherByCity(ctx, city)
 	// When the Redis key expires, It will be skip err and the data is re-stored in Redis.
 	// This prevents continuous API requests with the previously stored key in Redis.
 	if err == nil {
-		// h.logger.Infow("Cached hit", "city", city)   \\ to see check if it is getting the data from redis
+		h.logger.Infow("Cached hit", "city", city)  
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": "success",
@@ -48,6 +53,8 @@ func (h *application) weatherHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// h.logger.Warnw("Cache miss, fetching from API", "city", city)
 
 	apiUrl := &types.Api{
 		Url: h.config.apiURL,
@@ -57,9 +64,12 @@ func (h *application) weatherHandler(w http.ResponseWriter, r *http.Request) {
 
 	store, err := h.weatherService.CreateWeather(ctx, apiUrl)
     if err != nil {
+		h.logger.Errorw("Failed to fetch weather data from API", "city", city, "error", err)
         http.Error(w, `{"status":"error","message":"`+err.Error()+`"}`, http.StatusBadRequest)
         return
     }
+
+	h.logger.Infow("Weather data fetched and cached", "city", city)
 
 	 // Return the fetched weather data
 	 w.Header().Set("Content-Type", "application/json")

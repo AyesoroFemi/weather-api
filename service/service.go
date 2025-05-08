@@ -11,11 +11,13 @@ import (
 	"github.com/weather-app/internal/repository"
 	"github.com/weather-app/types"
 	"github.com/weather-app/utils"
+	"go.uber.org/zap"
 )
 
 type weatherService struct {
 	weatherRepository repository.WeatherRepository
 	contextTimeout    time.Duration
+	logger            *zap.SugaredLogger
 }
 
 type WeatherService interface {
@@ -23,10 +25,11 @@ type WeatherService interface {
 	GetWeatherByCity(ctx context.Context, city string) (types.StoreData, error)
 }
 
-func NewWeatherService(weatherRepository repository.WeatherRepository, timeout time.Duration) WeatherService {
+func NewWeatherService(weatherRepository repository.WeatherRepository, timeout time.Duration, logger *zap.SugaredLogger) WeatherService {
 	return &weatherService{
 		weatherRepository: weatherRepository,
 		contextTimeout:    timeout,
+		logger: logger,
 	}
 }
 
@@ -37,11 +40,19 @@ func (s *weatherService) CreateWeather(ctx context.Context, url *types.Api) (*ty
 
 	body, err := utils.ApiCall(apiUrl)
 	if err != nil {
+		s.logger.Errorw("Failed to make API call",
+			"url", apiUrl,
+			"error", err,
+		)
 		return nil, err
 	}
 
 	err = json.Unmarshal(body, &weather)
 	if err != nil {
+		s.logger.Errorw("Failed to unmarshal API response",
+			"response", string(body),
+			"error", err,
+		)
 		return nil, err
 	}
 
@@ -60,21 +71,38 @@ func (s *weatherService) CreateWeather(ctx context.Context, url *types.Api) (*ty
 		Code:        weather.Current.Condition.Code,
 		Uv:          weather.Current.Uv,
 	}
+
 	if store.Name == "" {
+		s.logger.Errorw("Invalid city name in API response",
+			"city", url.City,
+			"response", weather,
+		)
 		return nil, fmt.Errorf("wrong query city name")
 	}
 
 	if utils.NormalizeCityName(store.Name) != utils.NormalizeCityName(url.City) {
-        return nil, fmt.Errorf("wrong query city name")
-    }
+		s.logger.Errorw("City name mismatch",
+			"expected", utils.NormalizeCityName(url.City),
+			"actual", utils.NormalizeCityName(store.Name),
+		)
+		return nil, fmt.Errorf("wrong query city name")
+	}
 
 	key := fmt.Sprintf("weather:%s", strings.ToLower(url.City))
 	w, err := json.Marshal(store)
 	if err != nil {
+		s.logger.Errorw("Failed to marshal weather data for caching",
+			"data", store,
+			"error", err,
+		)
 		return nil, err
 	}
 	err = s.weatherRepository.CreateWeather(ctx, key, w)
 	if err != nil {
+		s.logger.Errorw("Failed to store weather data in cache",
+			"key", key,
+			"error", err,
+		)
 		return nil, err
 	}
 	return store, nil

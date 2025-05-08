@@ -29,7 +29,7 @@ func main() {
 		contextTimeout: env.GetInt("TIME_DURATION", 10),
 	}
 
-	logger  := zap.Must(zap.NewProduction()).Sugar()
+	logger := zap.Must(zap.NewProduction()).Sugar()
 	defer logger.Sync()
 
 	rdb = store.NewRedisCache(cfg.redisCfg.addr, cfg.redisCfg.pw, cfg.redisCfg.db)
@@ -39,20 +39,20 @@ func main() {
 
 	expiry := time.Duration(cfg.contextTimeout) * time.Minute
 	timeout := time.Duration(cfg.contextTimeout) * time.Second
-	
+
 	redisStore := repository.NewWeatherRepo(rdb, expiry)
-	weatheService := service.NewWeatherService(redisStore, timeout)
+	weatheService := service.NewWeatherService(redisStore, timeout, logger)
 
 	app := &application{
-		config: cfg,
+		config:         cfg,
 		weatherService: weatheService,
-		logger: logger,
+		logger:         logger,
 	}
 
 	mux := app.mount()
-    if err := app.run(mux); err != nil {
+	if err := app.run(mux); err != nil {
 		fmt.Println("err connecting ")
-    }
+	}
 	log.Println(app.run(mux))
 
 }
