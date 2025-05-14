@@ -23,5 +23,6 @@ type Weather struct {
 			Icon string `json:"icon"`
 			Code int `json:"code"`
 		} `json:"condition"`
+		
 	} `json:"current"`
 }
